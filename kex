@@ -28,6 +28,8 @@ require 'shell'
 # - will not work with deployments using persistant volumes
 # - 
 
+TIMEOUT = 3600
+
 COMMON_RESOURCES_SPEC = {
   "limits" => {
     "cpu" => "1000m",
@@ -122,7 +124,7 @@ def patch_container_for_run(container_spec)
 
   # Only copy whitelisted attributes:
   {
-    "args" => ["sleep 300"],
+    "args" => ["sleep #{TIMEOUT}"],
     "command" => ["/bin/sh", "-c"], # just start shell so it keeps container running waiting for input
     "env" => container_spec["env"],
     "envFrom" => container_spec["envFrom"],
