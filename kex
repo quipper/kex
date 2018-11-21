@@ -115,7 +115,7 @@ def create_pod_spec_from_original(pod_spec, app_name)
     "apiVersion" => pod_spec["apiVersion"],
     "kind" => pod_spec["kind"],
     "metadata" => {
-      "generateName" => pod_spec["metadata"]["generateName"] + "kex-#{runner}-",
+      "generateName" => pod_spec["metadata"]["generateName"] + "-kex-#{runner}-",
       "labels" => pod_spec["metadata"]["labels"]
         .merge({
         "app" => pod_spec["metadata"]["labels"]["app"] + "-kex",
