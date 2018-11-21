@@ -61,12 +61,18 @@ def run_pod_session(app_name, command, kubectl_options)
   # TODO actually wait for it
   sleep 5
 
-  # Exec in the running pod with given command
-  system("kubectl #{kubectl_options} exec -c #{app_name} -it #{pod_name} #{command}")
-
-  # Delete the pod
-  puts "Deleting pod #{pod_name} ..."
-  system("kubectl #{kubectl_options} delete pod #{pod_name}")
+  begin
+    # Exec in the running pod with given command
+    puts "Executing the specified command '#{command}' on '#{pod_name}'..."
+    puts "(This container will terminate automatically in #{TIMEOUT} seconds.)"
+    system("kubectl #{kubectl_options} exec -c #{app_name} -it #{pod_name} #{command}")
+  rescue SignalException => e
+    STDERR.puts "Exited by unexpected signal: #{e.signm}"
+  ensure
+    # Delete the pod
+    puts "Deleting pod #{pod_name} ..."
+    system("kubectl #{kubectl_options} delete pod #{pod_name}")
+  end
 end
 
 # Create pod with given spec Hash and kubectl options string
