@@ -57,9 +57,20 @@ def run_pod_session(app_name, command, kubectl_options)
   pod_name = create_pod(create_pod_spec, kubectl_options)
 
   # Wait until the container is running
-  puts "Waiting for pod to start..."
-  # TODO actually wait for it
-  sleep 5
+  try = 5
+  cnt = 0
+  begin
+    puts "Waiting for pod to start..."
+    status = `kubectl #{kubectl_options} get pods #{pod_name} -o="jsonpath={.status.phase}"`
+    raise if status != 'Running'
+  rescue
+    cnt += 1
+    if cnt < try
+      sleep 2
+      retry
+    end
+    STDERR.puts "It may have failed to start the pod"
+  end
 
   begin
     # Exec in the running pod with given command
