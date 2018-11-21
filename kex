@@ -28,6 +28,19 @@ require 'shell'
 # - will not work with deployments using persistant volumes
 # - 
 
+TIMEOUT = 3600
+
+COMMON_RESOURCES_SPEC = {
+  "limits" => {
+    "cpu" => "1000m",
+    "memory" => "1000Mi"
+  },
+  "requests" => {
+    "cpu" => "1m",
+    "memory" => "100Mi"
+  }
+}.freeze
+
 def main
   kubectl_args  = ARGV.take_while { |opt| opt != '--' }
   kubectl_options = kubectl_args.join(' ')
@@ -44,16 +57,33 @@ def run_pod_session(app_name, command, kubectl_options)
   pod_name = create_pod(create_pod_spec, kubectl_options)
 
   # Wait until the container is running
-  puts "Waiting for pod to start..."
-  # TODO actually wait for it
-  sleep 5
+  try = 5
+  cnt = 0
+  begin
+    puts "Waiting for pod to start..."
+    status = `kubectl #{kubectl_options} get pods #{pod_name} -o="jsonpath={.status.phase}"`
+    raise if status != 'Running'
+  rescue
+    cnt += 1
+    if cnt < try
+      sleep 2
+      retry
+    end
+    STDERR.puts "It may have failed to start the pod"
+  end
 
-  # Exec in the running pod with given command
-  system("kubectl #{kubectl_options} exec -c #{app_name} -it #{pod_name} #{command}")
-
-  # Delete the pod
-  puts "Deleting pod #{pod_name} ..."
-  system("kubectl #{kubectl_options} delete pod #{pod_name}")
+  begin
+    # Exec in the running pod with given command
+    puts "Executing the specified command '#{command}' on '#{pod_name}'..."
+    puts "(This container will terminate automatically in #{TIMEOUT} seconds.)"
+    system("kubectl #{kubectl_options} exec -c #{app_name} -it #{pod_name} #{command}")
+  rescue SignalException => e
+    STDERR.puts "Exited by unexpected signal: #{e.signm}"
+  ensure
+    # Delete the pod
+    puts "Deleting pod #{pod_name} ..."
+    system("kubectl #{kubectl_options} delete pod #{pod_name}")
+  end
 end
 
 # Create pod with given spec Hash and kubectl options string
@@ -78,14 +108,20 @@ end
 # Generate new pod spec
 
 def create_pod_spec_from_original(pod_spec, app_name)
+  # "kubectl whoami" would be better in some cases.
+  # ref: https://github.com/kubernetes/kubernetes/pull/65884
+  runner = ENV['SUDO_USER'] || ENV['USER'] || "UNKNOWN"
   {
     "apiVersion" => pod_spec["apiVersion"],
     "kind" => pod_spec["kind"],
     "metadata" => {
-      "generateName" => pod_spec["metadata"]["generateName"] + "kex-",
-      "labels" =>
-        pod_spec["metadata"]["labels"]
-        .merge("app" => pod_spec["metadata"]["labels"]["app"] + "-kex"),
+      "generateName" => pod_spec["metadata"]["generateName"] + "kex-#{runner}-",
+      "labels" => pod_spec["metadata"]["labels"]
+        .merge({
+        "app" => pod_spec["metadata"]["labels"]["app"] + "-kex",
+        "heritage" => "kex",
+        "runner"   => runner,
+        }),
       "namespace" => pod_spec["metadata"]["namespace"]
     },
     "spec" => {
@@ -111,7 +147,7 @@ def patch_container_for_run(container_spec)
 
   # Only copy whitelisted attributes:
   {
-    "args" => ["sleep 300"],
+    "args" => ["sleep #{TIMEOUT}"],
     "command" => ["/bin/sh", "-c"], # just start shell so it keeps container running waiting for input
     "env" => container_spec["env"],
     "envFrom" => container_spec["envFrom"],
@@ -120,7 +156,7 @@ def patch_container_for_run(container_spec)
     "name" => container_spec["name"],
     "stdinOnce" => true, # this is to keep /bin/sh running
     "tty" => true,
-    "resources" => container_spec["resources"],
+    "resources" => COMMON_RESOURCES_SPEC,
     "volumeMounts" => container_spec["volumeMounts"]
   }
 end
