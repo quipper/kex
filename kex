@@ -28,6 +28,17 @@ require 'shell'
 # - will not work with deployments using persistant volumes
 # - 
 
+COMMON_RESOURCES_SPEC = {
+  "limits" => {
+    "cpu" => "1000m",
+    "memory" => "1000Mi"
+  },
+  "requests" => {
+    "cpu" => "1m",
+    "memory" => "100Mi"
+  }
+}.freeze
+
 def main
   kubectl_args  = ARGV.take_while { |opt| opt != '--' }
   kubectl_options = kubectl_args.join(' ')
@@ -120,7 +131,7 @@ def patch_container_for_run(container_spec)
     "name" => container_spec["name"],
     "stdinOnce" => true, # this is to keep /bin/sh running
     "tty" => true,
-    "resources" => container_spec["resources"],
+    "resources" => COMMON_RESOURCES_SPEC,
     "volumeMounts" => container_spec["volumeMounts"]
   }
 end
