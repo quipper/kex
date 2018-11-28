@@ -57,7 +57,7 @@ def run_pod_session(app_name, command, kubectl_options)
   pod_name = create_pod(create_pod_spec, kubectl_options)
 
   # Wait until the container is running
-  try = 5
+  try = 10
   cnt = 0
   begin
     puts "Waiting for pod to start..."
