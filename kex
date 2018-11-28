@@ -59,10 +59,12 @@ def run_pod_session(app_name, command, kubectl_options)
   # Wait until the container is running
   try = 10
   cnt = 0
+  print "Waiting for the pod to start"
   begin
-    puts "Waiting for pod to start..."
+    print "."
     status = `kubectl #{kubectl_options} get pods #{pod_name} -o="jsonpath={.status.phase}"`
     raise if status != 'Running'
+    puts ""
   rescue
     cnt += 1
     if cnt < try
