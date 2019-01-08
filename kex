@@ -86,6 +86,15 @@ def run_pod_session(app_name, command, kubectl_options)
     puts "Deleting pod #{pod_name} ..."
     system("kubectl #{kubectl_options} delete pod #{pod_name}")
   end
+
+  cleanup_orphaned_pods(kubectl_options)
+end
+
+def cleanup_orphaned_pods(kubectl_options)
+  pods = %x[kubectl #{kubectl_options} get pod -l heritage=kex --field-selector=status.phase!=Running -o custom-columns=":metadata.name" --no-headers]
+  return if pods.empty?
+  puts "Deleting existing orphaned kex pods ..."
+  system(%[kubectl #{kubectl_options} delete pods #{pods.gsub("\n", " ")}])
 end
 
 # Create pod with given spec Hash and kubectl options string
@@ -127,7 +136,8 @@ def create_pod_spec_from_original(pod_spec, app_name)
     },
     "spec" => {
       "containers" => patch_containers_for_run(pod_spec["spec"]["containers"], app_name),
-      "volumes" => pod_spec["spec"]["volumes"]
+      "volumes" => pod_spec["spec"]["volumes"],
+      "restartPolicy" => "Never"
     }
   }
 end
