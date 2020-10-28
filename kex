@@ -120,7 +120,10 @@ end
 def create_pod_spec_from_original(pod_spec, app_name)
   # "kubectl whoami" would be better in some cases.
   # ref: https://github.com/kubernetes/kubernetes/pull/65884
-  runner = ENV['SUDO_USER'] || ENV['USER'] || "UNKNOWN"
+
+  # If the user name is uppercase, it will fail, so make it lowercase.
+  # ref: https://github.com/quipper/quipper/issues/26344
+  runner = (ENV['SUDO_USER'] || ENV['USER'] || "UNKNOWN").downcase
   {
     "apiVersion" => pod_spec["apiVersion"],
     "kind" => pod_spec["kind"],
